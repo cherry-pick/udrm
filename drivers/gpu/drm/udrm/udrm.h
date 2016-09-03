@@ -21,6 +21,14 @@ struct udrm_device;
 
 /* udrm devices */
 
+struct udrm_device {
+	unsigned long n_bindings;
+	struct device dev;
+	struct drm_device *ddev;
+	struct rw_semaphore cdev_lock;
+	struct udrm_cdev *cdev_unlocked;
+};
+
 struct udrm_device *udrm_device_new(struct device *parent);
 struct udrm_device *udrm_device_ref(struct udrm_device *udrm);
 struct udrm_device *udrm_device_unref(struct udrm_device *udrm);

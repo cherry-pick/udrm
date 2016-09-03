@@ -19,14 +19,6 @@
 #include <linux/slab.h>
 #include "udrm.h"
 
-struct udrm_device {
-	unsigned long n_bindings;
-	struct device dev;
-	struct drm_device *ddev;
-	struct rw_semaphore cdev_lock;
-	struct udrm_cdev *cdev_unlocked;
-};
-
 static struct drm_driver udrm_drm_driver;
 static DEFINE_MUTEX(udrm_drm_lock);
 

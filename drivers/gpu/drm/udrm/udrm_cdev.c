@@ -94,6 +94,11 @@ static unsigned int udrm_cdev_fop_poll(struct file *file, poll_table *wait)
 	return 0;
 }
 
+static int udrm_cdev_fop_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	return -EIO;
+}
+
 static long udrm_cdev_fop_ioctl(struct file *file,
 				unsigned int cmd,
 				unsigned long arg)
@@ -136,6 +141,7 @@ static const struct file_operations udrm_cdev_fops = {
 	.release	= udrm_cdev_fop_release,
 	.read		= udrm_cdev_fop_read,
 	.poll		= udrm_cdev_fop_poll,
+	.mmap		= udrm_cdev_fop_mmap,
 	.unlocked_ioctl	= udrm_cdev_fop_ioctl,
 	.compat_ioctl	= udrm_cdev_fop_ioctl,
 	.llseek		= no_llseek,

@@ -19,11 +19,13 @@
 
 struct udrm_cdev {
 	struct mutex lock;
+	struct udrm_device *udrm;
 };
 
 static struct udrm_cdev *udrm_cdev_free(struct udrm_cdev *cdev)
 {
 	if (cdev) {
+		udrm_device_unref(cdev->udrm);
 		mutex_destroy(&cdev->lock);
 		kfree(cdev);
 	}
@@ -34,6 +36,7 @@ static struct udrm_cdev *udrm_cdev_free(struct udrm_cdev *cdev)
 static struct udrm_cdev *udrm_cdev_new(void)
 {
 	struct udrm_cdev *cdev;
+	int r;
 
 	cdev = kzalloc(sizeof(*cdev), GFP_KERNEL);
 	if (!cdev)
@@ -41,7 +44,18 @@ static struct udrm_cdev *udrm_cdev_new(void)
 
 	mutex_init(&cdev->lock);
 
+	cdev->udrm = udrm_device_new(udrm_cdev_misc.this_device);
+	if (IS_ERR(cdev->udrm)) {
+		r = PTR_ERR(cdev->udrm);
+		cdev->udrm = NULL;
+		goto error;
+	}
+
 	return cdev;
+
+error:
+	udrm_cdev_free(cdev);
+	return ERR_PTR(r);
 }
 
 static int udrm_cdev_fop_open(struct inode *inode, struct file *file)

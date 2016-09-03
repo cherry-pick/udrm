@@ -11,6 +11,7 @@
 #include <linux/err.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
+#include <linux/miscdevice.h>
 #include <linux/mutex.h>
 #include <linux/poll.h>
 #include <linux/slab.h>
@@ -20,15 +21,36 @@ struct udrm_cdev {
 	struct mutex lock;
 };
 
-static int udrm_cdev_fop_open(struct inode *inode, struct file *file)
+static struct udrm_cdev *udrm_cdev_free(struct udrm_cdev *cdev)
+{
+	if (cdev) {
+		mutex_destroy(&cdev->lock);
+		kfree(cdev);
+	}
+
+	return NULL;
+}
+
+static struct udrm_cdev *udrm_cdev_new(void)
 {
 	struct udrm_cdev *cdev;
 
 	cdev = kzalloc(sizeof(*cdev), GFP_KERNEL);
 	if (!cdev)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	mutex_init(&cdev->lock);
+
+	return cdev;
+}
+
+static int udrm_cdev_fop_open(struct inode *inode, struct file *file)
+{
+	struct udrm_cdev *cdev;
+
+	cdev = udrm_cdev_new();
+	if (IS_ERR(cdev))
+		return PTR_ERR(cdev);
 
 	file->private_data = cdev;
 	return 0;
@@ -38,8 +60,7 @@ static int udrm_cdev_fop_release(struct inode *inode, struct file *file)
 {
 	struct udrm_cdev *cdev = file->private_data;
 
-	mutex_destroy(&cdev->lock);
-	kfree(cdev);
+	udrm_cdev_free(cdev);
 
 	return 0;
 }
@@ -57,11 +78,17 @@ static unsigned int udrm_cdev_fop_poll(struct file *file, poll_table *wait)
 	return 0;
 }
 
-const struct file_operations udrm_cdev_fops = {
+static const struct file_operations udrm_cdev_fops = {
 	.owner		= THIS_MODULE,
 	.open		= udrm_cdev_fop_open,
 	.release	= udrm_cdev_fop_release,
 	.read		= udrm_cdev_fop_read,
 	.poll		= udrm_cdev_fop_poll,
 	.llseek		= no_llseek,
+};
+
+struct miscdevice udrm_cdev_misc = {
+	.fops		= &udrm_cdev_fops,
+	.minor		= MISC_DYNAMIC_MINOR,
+	.name		= KBUILD_MODNAME,
 };

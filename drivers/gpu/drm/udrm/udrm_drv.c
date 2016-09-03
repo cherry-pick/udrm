@@ -14,17 +14,11 @@
 #include <linux/module.h>
 #include "udrm.h"
 
-static struct miscdevice udrm_misc = {
-	.fops		= &udrm_cdev_fops,
-	.minor		= MISC_DYNAMIC_MINOR,
-	.name		= KBUILD_MODNAME,
-};
-
 static int __init udrm_init(void)
 {
 	int r;
 
-	r = misc_register(&udrm_misc);
+	r = misc_register(&udrm_cdev_misc);
 	if (r < 0)
 		return r;
 
@@ -34,7 +28,7 @@ static int __init udrm_init(void)
 
 static void __exit udrm_exit(void)
 {
-	misc_deregister(&udrm_misc);
+	misc_deregister(&udrm_cdev_misc);
 	pr_info("unloaded\n");
 }
 

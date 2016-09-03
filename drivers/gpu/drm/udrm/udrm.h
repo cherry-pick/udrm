@@ -12,8 +12,10 @@
 
 #include <linux/kernel.h>
 
-struct file_operations;
+struct miscdevice;
 
-extern const struct file_operations udrm_cdev_fops;
+/* udrm cdevs */
+
+extern struct miscdevice udrm_cdev_misc;
 
 #endif /* __UDRM_UDRM_H */

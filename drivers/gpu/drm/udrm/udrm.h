@@ -12,4 +12,8 @@
 
 #include <linux/kernel.h>
 
+struct file_operations;
+
+extern const struct file_operations udrm_cdev_fops;
+
 #endif /* __UDRM_UDRM_H */

@@ -1,0 +1,15 @@
+config DRM_UDRM
+	tristate "Virtual DRM Device Driver"
+	depends on DRM
+	select DRM_KMS_HELPER
+	help
+	  The udrm driver allows user-space to create virtual
+	  DRM/KMS devices on-demand. Those devices are
+	  fully-operated by user-space, utilizing the DRM/KMS
+	  subsystem to integrate them into the existing graphics
+	  stack.
+
+	  If unsure, say N.
+
+	  To compile this driver as a module, choose M here: the
+	  module will be called udrm.

@@ -13,6 +13,7 @@
 #include <linux/kernel.h>
 
 struct miscdevice;
+struct udrm_cdev;
 struct udrm_device;
 
 /* udrm devices */
@@ -20,7 +21,10 @@ struct udrm_device;
 struct udrm_device *udrm_device_new(struct device *parent);
 struct udrm_device *udrm_device_ref(struct udrm_device *udrm);
 struct udrm_device *udrm_device_unref(struct udrm_device *udrm);
-int udrm_device_register(struct udrm_device *udrm);
+struct udrm_cdev *udrm_device_acquire(struct udrm_device *udrm);
+struct udrm_cdev *udrm_device_release(struct udrm_device *udrm,
+				      struct udrm_cdev *cdev);
+int udrm_device_register(struct udrm_device *udrm, struct udrm_cdev *cdev);
 void udrm_device_unregister(struct udrm_device *udrm);
 
 /* udrm cdevs */

@@ -14,12 +14,16 @@
 #include <linux/fs.h>
 #include <linux/kernel.h>
 #include <linux/mutex.h>
+#include <linux/rwsem.h>
 #include <linux/slab.h>
 #include "udrm.h"
 
 struct udrm_device {
+	unsigned long n_bindings;
 	struct device dev;
 	struct drm_device *ddev;
+	struct rw_semaphore cdev_lock;
+	struct udrm_cdev *cdev_unlocked;
 };
 
 static struct drm_driver udrm_drm_driver;
@@ -29,7 +33,9 @@ static void udrm_device_free(struct device *dev)
 {
 	struct udrm_device *udrm = container_of(dev, struct udrm_device, dev);
 
+	WARN_ON(udrm->cdev_unlocked);
 	drm_dev_unref(udrm->ddev);
+	WARN_ON(udrm->n_bindings > 0);
 	kfree(udrm);
 }
 
@@ -45,6 +51,7 @@ struct udrm_device *udrm_device_new(struct device *parent)
 	device_initialize(&udrm->dev);
 	udrm->dev.release = udrm_device_free;
 	udrm->dev.parent = parent;
+	init_rwsem(&udrm->cdev_lock);
 
 	udrm->ddev = drm_dev_alloc(&udrm_drm_driver, &udrm->dev);
 	if (!udrm->ddev) {
@@ -52,6 +59,7 @@ struct udrm_device *udrm_device_new(struct device *parent)
 		goto error;
 	}
 
+	udrm->ddev->dev_private = udrm;
 	return udrm;
 
 error:
@@ -75,53 +83,96 @@ struct udrm_device *udrm_device_unref(struct udrm_device *udrm)
 	return NULL;
 }
 
+struct udrm_cdev *udrm_device_acquire(struct udrm_device *udrm)
+{
+	if (udrm) {
+		down_read(&udrm->cdev_lock);
+		if (udrm->cdev_unlocked)
+			return udrm->cdev_unlocked;
+		up_read(&udrm->cdev_lock);
+	}
+
+	return NULL;
+}
+
+struct udrm_cdev *udrm_device_release(struct udrm_device *udrm,
+				      struct udrm_cdev *cdev)
+{
+	if (!cdev || WARN_ON(!udrm))
+		return NULL;
+
+	WARN_ON(cdev != udrm->cdev_unlocked);
+	up_read(&udrm->cdev_lock);
+	return NULL;
+}
+
 static void udrm_device_unbind(struct udrm_device *udrm)
 {
+	lockdep_assert_held(&udrm_drm_lock);
+
+	if (!udrm || WARN_ON(udrm->n_bindings < 1) || --udrm->n_bindings > 0)
+		return;
+
+	/* XXX: unbind DRM resources */
+	udrm_device_unref(udrm);
 }
 
 static int udrm_device_bind(struct udrm_device *udrm)
 {
+	lockdep_assert_held(&udrm_drm_lock);
+
+	if (udrm->n_bindings < 1) {
+		/* XXX: bind DRM resources */
+		udrm_device_ref(udrm);
+	}
+
+	++udrm->n_bindings;
 	return 0;
 }
 
-int udrm_device_register(struct udrm_device *udrm)
+int udrm_device_register(struct udrm_device *udrm, struct udrm_cdev *cdev)
 {
 	static u64 id_counter;
 	int r;
 
+	if (WARN_ON(!udrm || device_is_registered(&udrm->dev)))
+		return -ENOTRECOVERABLE;
+
 	mutex_lock(&udrm_drm_lock);
 
-	if (WARN_ON(!udrm || device_is_registered(&udrm->dev))) {
-		r = -ENOTRECOVERABLE;
-		goto exit;
-	}
+	down_write(&udrm->cdev_lock);
+	udrm->cdev_unlocked = cdev;
+	up_write(&udrm->cdev_lock);
+
+	r = dev_set_name(&udrm->dev, KBUILD_MODNAME "-%llu",
+			 (unsigned long long)id_counter++);
+	if (r < 0)
+		goto exit_cleanup;
 
 	r = udrm_device_bind(udrm);
 	if (r < 0)
-		goto exit;
-
-	r = dev_set_name(&udrm->dev, KBUILD_MODNAME "-%llu",
-			 (unsigned long long)id_counter);
-	if (r < 0)
-		goto exit;
+		goto exit_cleanup;
 
 	r = device_add(&udrm->dev);
 	if (r < 0)
-		goto exit;
+		goto exit_unbind;
 
 	r = drm_dev_register(udrm->ddev, 0);
 	if (r < 0)
-		goto exit;
+		goto exit_del;
 
-	++id_counter;
 	r = 0;
+	goto exit;
 
+exit_del:
+	device_del(&udrm->dev);
+exit_unbind:
+	udrm_device_unbind(udrm);
+exit_cleanup:
+	down_write(&udrm->cdev_lock);
+	udrm->cdev_unlocked = NULL;
+	up_write(&udrm->cdev_lock);
 exit:
-	if (r < 0) {
-		if (device_is_registered(&udrm->dev))
-			device_del(&udrm->dev);
-		udrm_device_unbind(udrm);
-	}
 	mutex_unlock(&udrm_drm_lock);
 	return r;
 }
@@ -129,18 +180,64 @@ exit:
 void udrm_device_unregister(struct udrm_device *udrm)
 {
 	mutex_lock(&udrm_drm_lock);
-
 	if (udrm && device_is_registered(&udrm->dev)) {
+		down_write(&udrm->cdev_lock);
+		udrm->cdev_unlocked = NULL;
+		up_write(&udrm->cdev_lock);
+
 		drm_dev_unregister(udrm->ddev);
 		device_del(&udrm->dev);
+		udrm_device_unbind(udrm);
 	}
-
 	mutex_unlock(&udrm_drm_lock);
 }
 
+static int udrm_drm_fop_open(struct inode *inode, struct file *file)
+{
+	struct udrm_device *udrm;
+	struct drm_device *ddev;
+	int r;
+
+	mutex_lock(&udrm_drm_lock);
+
+	r = drm_open(inode, file);
+	if (r < 0)
+		goto exit;
+
+	ddev = file->private_data;
+	udrm = ddev->dev_private;
+
+	r = udrm_device_bind(udrm);
+	if (r < 0) {
+		drm_release(inode, file);
+		goto exit;
+	}
+
+	r = 0;
+
+exit:
+	mutex_unlock(&udrm_drm_lock);
+	return r;
+}
+
+static int udrm_drm_fop_release(struct inode *inode, struct file *file)
+{
+	struct drm_device *ddev = file->private_data;
+	struct udrm_device *udrm = ddev->dev_private;
+
+	mutex_lock(&udrm_drm_lock);
+	drm_release(inode, file);
+	udrm_device_unbind(udrm);
+	mutex_unlock(&udrm_drm_lock);
+
+	return 0;
+}
+
 static const struct file_operations udrm_drm_fops = {
-	.owner = THIS_MODULE,
-	.llseek = noop_llseek,
+	.owner			= THIS_MODULE,
+	.llseek			= noop_llseek,
+	.open			= udrm_drm_fop_open,
+	.release		= udrm_drm_fop_release,
 };
 
 static struct drm_driver udrm_drm_driver = {

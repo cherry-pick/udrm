@@ -128,8 +128,8 @@ int udrm_device_register(struct udrm_device *udrm, struct udrm_cdev *cdev)
 	static u64 id_counter;
 	int r;
 
-	if (WARN_ON(!udrm || device_is_registered(&udrm->dev)))
-		return -ENOTRECOVERABLE;
+	if (device_is_registered(&udrm->dev))
+		return -EALREADY;
 
 	mutex_lock(&udrm_drm_lock);
 

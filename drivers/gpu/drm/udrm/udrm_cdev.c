@@ -15,6 +15,7 @@
 #include <linux/mutex.h>
 #include <linux/poll.h>
 #include <linux/slab.h>
+#include <uapi/linux/udrm.h>
 #include "udrm.h"
 
 struct udrm_cdev {
@@ -74,6 +75,7 @@ static int udrm_cdev_fop_release(struct inode *inode, struct file *file)
 {
 	struct udrm_cdev *cdev = file->private_data;
 
+	udrm_device_unregister(cdev->udrm);
 	udrm_cdev_free(cdev);
 
 	return 0;
@@ -92,12 +94,50 @@ static unsigned int udrm_cdev_fop_poll(struct file *file, poll_table *wait)
 	return 0;
 }
 
+static long udrm_cdev_fop_ioctl(struct file *file,
+				unsigned int cmd,
+				unsigned long arg)
+{
+	struct udrm_cdev *cdev = file->private_data;
+	int r = 0;
+
+	mutex_lock(&cdev->lock);
+	switch (cmd) {
+	case UDRM_CMD_REGISTER:
+		if (unlikely(arg))
+			r = -EINVAL;
+		else
+			r = udrm_device_register(cdev->udrm, cdev);
+		break;
+	case UDRM_CMD_UNREGISTER:
+		if (unlikely(arg))
+			r = -EINVAL;
+		else
+			udrm_device_unregister(cdev->udrm);
+		break;
+	case UDRM_CMD_PLUG:
+		r = -ENOTTY; /* XXX: not implemented */
+		break;
+	case UDRM_CMD_UNPLUG:
+		r = -ENOTTY; /* XXX: not implemented */
+		break;
+	default:
+		r = -ENOTTY;
+		break;
+	}
+	mutex_unlock(&cdev->lock);
+
+	return r;
+}
+
 static const struct file_operations udrm_cdev_fops = {
 	.owner		= THIS_MODULE,
 	.open		= udrm_cdev_fop_open,
 	.release	= udrm_cdev_fop_release,
 	.read		= udrm_cdev_fop_read,
 	.poll		= udrm_cdev_fop_poll,
+	.unlocked_ioctl	= udrm_cdev_fop_ioctl,
+	.compat_ioctl	= udrm_cdev_fop_ioctl,
 	.llseek		= no_llseek,
 };
 

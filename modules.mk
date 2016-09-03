@@ -13,8 +13,11 @@ DIR			?= drivers
 KERNELVER		?= $(shell uname -r)
 KERNELDIR 		?= /lib/modules/$(KERNELVER)/build
 PWD			:= $(shell pwd)
+EXTRA_CFLAGS		+= -I$(PWD)/include
 
 module:
-	$(MAKE) -C $(KERNELDIR) M=$(PWD)/$(DIR)
+	$(MAKE) -C $(KERNELDIR) \
+		M=$(PWD)/$(DIR) \
+		EXTRA_CFLAGS="$(EXTRA_CFLAGS)"
 
 .PHONY: module

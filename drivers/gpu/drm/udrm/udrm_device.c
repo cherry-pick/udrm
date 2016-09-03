@@ -9,6 +9,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #include <drm/drmP.h>
+#include <drm/drm_gem.h>
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/fs.h>
@@ -243,7 +244,10 @@ static const struct file_operations udrm_drm_fops = {
 static struct drm_driver udrm_drm_driver = {
 	.driver_features = DRIVER_GEM | DRIVER_MODESET | DRIVER_ATOMIC,
 	.fops = &udrm_drm_fops,
-
+	.gem_free_object = udrm_bo_free,
+	.dumb_create = udrm_dumb_create,
+	.dumb_map_offset = udrm_dumb_map_offset,
+	.dumb_destroy = drm_gem_dumb_destroy,
 	.name = "udrm",
 	.desc = "Virtual DRM Device Driver",
 	.date = "20160903",

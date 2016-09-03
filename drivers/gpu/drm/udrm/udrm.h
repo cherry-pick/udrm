@@ -13,6 +13,7 @@
 #include <drm/drmP.h>
 #include <drm/drm_crtc.h>
 #include <drm/drm_gem.h>
+#include <drm/drm_simple_kms_helper.h>
 #include <linux/kernel.h>
 
 struct miscdevice;
@@ -27,6 +28,8 @@ struct udrm_device {
 	struct drm_device *ddev;
 	struct rw_semaphore cdev_lock;
 	struct udrm_cdev *cdev_unlocked;
+	struct drm_simple_display_pipe pipe;
+	struct drm_connector conn;
 };
 
 struct udrm_device *udrm_device_new(struct device *parent);
@@ -54,6 +57,19 @@ int udrm_dumb_map_offset(struct drm_file *dfile,
 			 struct drm_device *ddev,
 			 uint32_t handle,
 			 uint64_t *offset);
+
+/* udrm kms */
+
+struct udrm_fb {
+	struct drm_framebuffer base;
+	struct udrm_bo *bo;
+};
+
+struct udrm_fb *udrm_fb_new(struct udrm_bo *bo,
+			    const struct drm_mode_fb_cmd2 *cmd);
+
+int udrm_kms_bind(struct udrm_device *udrm);
+void udrm_kms_unbind(struct udrm_device *udrm);
 
 /* udrm cdevs */
 

@@ -106,16 +106,21 @@ static void udrm_device_unbind(struct udrm_device *udrm)
 	if (!udrm || WARN_ON(udrm->n_bindings < 1) || --udrm->n_bindings > 0)
 		return;
 
-	/* XXX: unbind DRM resources */
+	udrm_kms_unbind(udrm);
 	udrm_device_unref(udrm);
 }
 
 static int udrm_device_bind(struct udrm_device *udrm)
 {
+	int r;
+
 	lockdep_assert_held(&udrm_drm_lock);
 
 	if (udrm->n_bindings < 1) {
-		/* XXX: bind DRM resources */
+		r = udrm_kms_bind(udrm);
+		if (r < 0)
+			return r;
+
 		udrm_device_ref(udrm);
 	}
 

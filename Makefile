@@ -8,10 +8,24 @@
 #
 
 all: module
+.PHONY: all
 
 module:
 	$(MAKE) -f modules.mk \
 		DIR=drivers/gpu/drm/udrm \
 		CONFIG_DRM_UDRM=m
+.PHONY: module
 
-.PHONY: all module
+tests:
+	CFLAGS="-g -O0" $(MAKE) -C tools/testing/selftests/udrm/
+.PHONY: tests
+
+tt-prepare: module
+	-sudo sh -c 'dmesg -c > /dev/null'
+	-sudo sh -c 'rmmod udrm$(UDRMEXT)'
+	sudo sh -c 'insmod drivers/gpu/drm/udrm/udrm$(UDRMEXT).ko'
+.PHONY: tt-prepare
+
+stt: tests tt-prepare
+	sudo tools/testing/selftests/udrm/udrm-test --module udrm$(UDRMEXT) ; (R=$$? ; dmesg ; exit $$R)
+.PHONY: tt

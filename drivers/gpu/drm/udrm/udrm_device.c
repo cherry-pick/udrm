@@ -35,6 +35,7 @@ static void udrm_device_free(struct device *dev)
 struct udrm_device *udrm_device_new(struct device *parent)
 {
 	struct udrm_device *udrm;
+	static u64 id_counter;
 	int r;
 
 	udrm = kzalloc(sizeof(*udrm), GFP_KERNEL);
@@ -45,6 +46,13 @@ struct udrm_device *udrm_device_new(struct device *parent)
 	udrm->dev.release = udrm_device_free;
 	udrm->dev.parent = parent;
 	init_rwsem(&udrm->cdev_lock);
+
+	mutex_lock(&udrm_drm_lock);
+	r = dev_set_name(&udrm->dev, KBUILD_MODNAME "-%llu",
+			 (unsigned long long)id_counter++);
+	mutex_unlock(&udrm_drm_lock);
+	if (r < 0)
+		goto error;
 
 	udrm->ddev = drm_dev_alloc(&udrm_drm_driver, &udrm->dev);
 	if (!udrm->ddev) {
@@ -130,7 +138,6 @@ static int udrm_device_bind(struct udrm_device *udrm)
 
 int udrm_device_register(struct udrm_device *udrm, struct udrm_cdev *cdev)
 {
-	static u64 id_counter;
 	int r;
 
 	if (device_is_registered(&udrm->dev))
@@ -141,11 +148,6 @@ int udrm_device_register(struct udrm_device *udrm, struct udrm_cdev *cdev)
 	down_write(&udrm->cdev_lock);
 	udrm->cdev_unlocked = cdev;
 	up_write(&udrm->cdev_lock);
-
-	r = dev_set_name(&udrm->dev, KBUILD_MODNAME "-%llu",
-			 (unsigned long long)id_counter++);
-	if (r < 0)
-		goto exit_cleanup;
 
 	r = udrm_device_bind(udrm);
 	if (r < 0)

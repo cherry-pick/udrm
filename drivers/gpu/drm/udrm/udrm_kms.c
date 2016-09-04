@@ -198,7 +198,7 @@ int udrm_kms_bind(struct udrm_device *udrm)
 	struct drm_device *ddev = udrm->ddev;
 	int r;
 
-	if (WARN_ON(udrm->ddev->mode_config.funcs))
+	if (WARN_ON(ddev->mode_config.funcs))
 		return -ENOTRECOVERABLE;
 
 	/* XXX: should be provided by hw */

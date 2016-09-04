@@ -6,5 +6,6 @@
 *.swp
 *.symvers
 
+udrm-test
 modules.order
 .tmp_versions

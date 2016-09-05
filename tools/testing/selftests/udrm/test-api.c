@@ -29,17 +29,34 @@ static void test_api_cdev(void)
 	fd = open(test_path, O_RDWR | O_CLOEXEC | O_NONBLOCK | O_NOCTTY);
 	assert(fd >= 0);
 
+	close(fd);
+}
+
+/* make sure simple REGISTER/UNREGISTER works */
+static void test_api_registration(void)
+{
+	int r, fd;
+
+	fd = open(test_path, O_RDWR | O_CLOEXEC | O_NONBLOCK | O_NOCTTY);
+	assert(fd >= 0);
+
+	r = ioctl(fd, UDRM_CMD_UNREGISTER, NULL);
+	assert(r < 0 && errno == ENOTCONN);
+
 	r = ioctl(fd, UDRM_CMD_REGISTER, NULL);
 	assert(r >= 0);
 
 	r = ioctl(fd, UDRM_CMD_REGISTER, NULL);
-	assert(r < 0 && errno == EALREADY);
+	assert(r < 0 && errno == EISCONN);
 
 	r = ioctl(fd, UDRM_CMD_UNREGISTER, NULL);
 	assert(r >= 0);
 
 	r = ioctl(fd, UDRM_CMD_UNREGISTER, NULL);
-	assert(r >= 0);
+	assert(r < 0 && errno == ESHUTDOWN);
+
+	r = ioctl(fd, UDRM_CMD_REGISTER, NULL);
+	assert(r < 0 && errno == ESHUTDOWN);
 
 	close(fd);
 }
@@ -47,6 +64,7 @@ static void test_api_cdev(void)
 int test_api(void)
 {
 	test_api_cdev();
+	test_api_registration();
 
 	return TEST_OK;
 }

@@ -78,14 +78,6 @@ static int udrm_cdev_fop_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-static ssize_t udrm_cdev_fop_read(struct file *file,
-				  char __user *data,
-				  size_t n_data,
-				  loff_t *offset)
-{
-	return -EAGAIN;
-}
-
 static unsigned int udrm_cdev_fop_poll(struct file *file, poll_table *wait)
 {
 	return 0;
@@ -221,7 +213,6 @@ static const struct file_operations udrm_cdev_fops = {
 	.owner		= THIS_MODULE,
 	.open		= udrm_cdev_fop_open,
 	.release	= udrm_cdev_fop_release,
-	.read		= udrm_cdev_fop_read,
 	.poll		= udrm_cdev_fop_poll,
 	.mmap		= udrm_cdev_fop_mmap,
 	.unlocked_ioctl	= udrm_cdev_fop_ioctl,

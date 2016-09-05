@@ -138,6 +138,7 @@ static int parse_argv(int argc, char **argv)
 				"Run udrm tests. If no test is specified, "
 				"all tests are run sequentially.\n\n"
 				"\t-h, --help         Print this help\n"
+				"\t    --module=udrm  Module name to use\n"
 				"\nTests:\n"
 				, program_invocation_short_name);
 

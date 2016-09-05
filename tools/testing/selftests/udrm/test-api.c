@@ -42,8 +42,6 @@ static void test_api_cdev(void)
 	assert(r >= 0);
 
 	close(fd);
-
-	return TEST_OK;
 }
 
 int test_api(void)

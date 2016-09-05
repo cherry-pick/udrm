@@ -47,8 +47,6 @@ static const struct test tests[] = {
 	{ .name = "api", .main = test_api },
 };
 
-int c_sys_clone(unsigned long flags, void *child_stack);
-
 #define c_align_to(_val, _to) (((_val) + (_to) - 1) & ~((_to) - 1))
 
 #endif /* __TEST_H */

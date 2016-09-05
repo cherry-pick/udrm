@@ -13,7 +13,6 @@
 #include <fcntl.h>
 #include <getopt.h>
 #include <linux/udrm.h>
-#include <linux/sched.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,15 +28,6 @@
 static const char *arg_module = "udrm";
 static const char *arg_test;
 char *test_path;
-
-int c_sys_clone(unsigned long flags, void *child_stack)
-{
-#if defined(__s390__) || defined(__CRIS__)
-	return (int)syscall(__NR_clone, child_stack, flags);
-#else
-	return (int)syscall(__NR_clone, flags, child_stack);
-#endif
-}
 
 static int fork_and_run(const struct test *test)
 {

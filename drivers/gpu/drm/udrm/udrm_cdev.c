@@ -111,12 +111,20 @@ static long udrm_cdev_fop_ioctl(struct file *file,
 	case UDRM_CMD_REGISTER:
 		if (unlikely(arg))
 			r = -EINVAL;
+		else if (udrm_device_is_registered(cdev->udrm))
+			r = -EISCONN;
+		else if (!udrm_device_is_new(cdev->udrm))
+			r = -ESHUTDOWN;
 		else
 			r = udrm_device_register(cdev->udrm, cdev);
 		break;
 	case UDRM_CMD_UNREGISTER:
 		if (unlikely(arg))
 			r = -EINVAL;
+		else if (udrm_device_is_new(cdev->udrm))
+			r = -ENOTCONN;
+		else if (!udrm_device_is_registered(cdev->udrm))
+			r = -ESHUTDOWN;
 		else
 			udrm_device_unregister(cdev->udrm);
 		break;

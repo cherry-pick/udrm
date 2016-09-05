@@ -38,6 +38,9 @@ struct udrm_device *udrm_device_unref(struct udrm_device *udrm);
 struct udrm_cdev *udrm_device_acquire(struct udrm_device *udrm);
 struct udrm_cdev *udrm_device_release(struct udrm_device *udrm,
 				      struct udrm_cdev *cdev);
+
+bool udrm_device_is_new(struct udrm_device *udrm);
+bool udrm_device_is_registered(struct udrm_device *udrm);
 int udrm_device_register(struct udrm_device *udrm, struct udrm_cdev *cdev);
 void udrm_device_unregister(struct udrm_device *udrm);
 

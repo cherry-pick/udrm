@@ -27,7 +27,7 @@ static void udrm_device_free(struct device *dev)
 {
 	struct udrm_device *udrm = container_of(dev, struct udrm_device, dev);
 
-	WARN_ON(udrm->cdev_unlocked);
+	WARN_ON(!IS_ERR_OR_NULL(udrm->cdev_unlocked));
 	drm_dev_unref(udrm->ddev);
 	WARN_ON(udrm->n_bindings > 0);
 	kfree(udrm);
@@ -87,7 +87,7 @@ struct udrm_cdev *udrm_device_acquire(struct udrm_device *udrm)
 {
 	if (udrm) {
 		down_read(&udrm->cdev_lock);
-		if (udrm->cdev_unlocked)
+		if (!IS_ERR_OR_NULL(udrm->cdev_unlocked))
 			return udrm->cdev_unlocked;
 		up_read(&udrm->cdev_lock);
 	}
@@ -135,12 +135,22 @@ static int udrm_device_bind(struct udrm_device *udrm)
 	return 0;
 }
 
+bool udrm_device_is_new(struct udrm_device *udrm)
+{
+	return udrm && udrm->cdev_unlocked == NULL;
+}
+
+bool udrm_device_is_registered(struct udrm_device *udrm)
+{
+	return udrm && !IS_ERR_OR_NULL(udrm->cdev_unlocked);
+}
+
 int udrm_device_register(struct udrm_device *udrm, struct udrm_cdev *cdev)
 {
 	int r;
 
-	if (device_is_registered(&udrm->dev))
-		return -EALREADY;
+	if (WARN_ON(!udrm_device_is_new(udrm)))
+		return -ENOTRECOVERABLE;
 
 	mutex_lock(&udrm_drm_lock);
 
@@ -169,7 +179,7 @@ exit_unbind:
 	udrm_device_unbind(udrm);
 exit_cleanup:
 	down_write(&udrm->cdev_lock);
-	udrm->cdev_unlocked = NULL;
+	udrm->cdev_unlocked = ERR_PTR(-ENODEV);
 	up_write(&udrm->cdev_lock);
 exit:
 	mutex_unlock(&udrm_drm_lock);
@@ -179,9 +189,9 @@ exit:
 void udrm_device_unregister(struct udrm_device *udrm)
 {
 	mutex_lock(&udrm_drm_lock);
-	if (udrm && device_is_registered(&udrm->dev)) {
+	if (udrm_device_is_registered(udrm)) {
 		down_write(&udrm->cdev_lock);
-		udrm->cdev_unlocked = NULL;
+		udrm->cdev_unlocked = ERR_PTR(-ENODEV);
 		up_write(&udrm->cdev_lock);
 
 		drm_dev_unregister(udrm->ddev);

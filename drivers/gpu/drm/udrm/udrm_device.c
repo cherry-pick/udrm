@@ -10,6 +10,7 @@
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #include <drm/drmP.h>
 #include <drm/drm_gem.h>
+#include <linux/atomic.h>
 #include <linux/device.h>
 #include <linux/err.h>
 #include <linux/fs.h>
@@ -34,8 +35,8 @@ static void udrm_device_free(struct device *dev)
 
 struct udrm_device *udrm_device_new(struct device *parent)
 {
+	static atomic64_t id_counter;
 	struct udrm_device *udrm;
-	static u64 id_counter;
 	int r;
 
 	udrm = kzalloc(sizeof(*udrm), GFP_KERNEL);
@@ -47,10 +48,8 @@ struct udrm_device *udrm_device_new(struct device *parent)
 	udrm->dev.parent = parent;
 	init_rwsem(&udrm->cdev_lock);
 
-	mutex_lock(&udrm_drm_lock);
 	r = dev_set_name(&udrm->dev, KBUILD_MODNAME "-%llu",
-			 (unsigned long long)id_counter++);
-	mutex_unlock(&udrm_drm_lock);
+			 (unsigned long long)atomic64_inc_return(&id_counter));
 	if (r < 0)
 		goto error;
 

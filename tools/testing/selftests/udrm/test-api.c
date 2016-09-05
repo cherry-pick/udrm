@@ -113,24 +113,30 @@ static void test_api_plugging(void)
 	r = ioctl(fd, UDRM_CMD_REGISTER, NULL);
 	assert(r >= 0);
 
+	r = ioctl(fd, UDRM_CMD_UNPLUG, NULL);
+	assert(r < 0 && errno == EALREADY);
+
 	r = ioctl(fd, UDRM_CMD_PLUG, &plug);
 	assert(r >= 0);
+
+	r = ioctl(fd, UDRM_CMD_PLUG, &plug);
+	assert(r < 0 && errno == EALREADY);
 
 	r = ioctl(fd, UDRM_CMD_UNPLUG, NULL);
 	assert(r >= 0);
 
-	r = ioctl(fd, UDRM_CMD_PLUG, &plug);
-	assert(r >= 0);
-
-	plug.ptr_edid = (uintptr_t)valid_edid;
-	plug.n_edid = sizeof(valid_edid);
-	r = ioctl(fd, UDRM_CMD_PLUG, &plug);
-	assert(r >= 0);
+	r = ioctl(fd, UDRM_CMD_UNPLUG, NULL);
+	assert(r < 0 && errno == EALREADY);
 
 	plug.ptr_edid = (uintptr_t)invalid_edid;
 	plug.n_edid = sizeof(invalid_edid);
 	r = ioctl(fd, UDRM_CMD_PLUG, &plug);
 	assert(r < 0 && errno == EINVAL);
+
+	plug.ptr_edid = (uintptr_t)valid_edid;
+	plug.n_edid = sizeof(valid_edid);
+	r = ioctl(fd, UDRM_CMD_PLUG, &plug);
+	assert(r >= 0);
 
 	close(fd);
 }

@@ -80,6 +80,7 @@ struct udrm_cdev {
 	struct mutex lock;
 	struct udrm_device *udrm;
 	struct edid *edid;
+	bool plugged : 1;
 };
 
 extern struct miscdevice udrm_cdev_misc;

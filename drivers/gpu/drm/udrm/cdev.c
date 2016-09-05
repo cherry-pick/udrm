@@ -113,6 +113,9 @@ static int udrm_cdev_ioctl_plug(struct udrm_cdev *cdev, unsigned long arg)
 	if (unlikely(param.ptr_edid != (u64)(unsigned long)param.ptr_edid))
 		return -EFAULT;
 
+	if (cdev->plugged)
+		return -EALREADY;
+
 	if (!param.n_edid) {
 		edid = NULL;
 	} else {
@@ -134,7 +137,9 @@ static int udrm_cdev_ioctl_plug(struct udrm_cdev *cdev, unsigned long arg)
 
 	/* XXX: notify the device */
 
-	kfree(cdev->edid);
+	cdev->plugged = true;
+
+	WARN_ON(cdev->edid);
 	cdev->edid = edid;
 
 	return 0;
@@ -146,7 +151,13 @@ error:
 
 static int udrm_cdev_ioctl_unplug(struct udrm_cdev *cdev)
 {
+
+	if (!cdev->plugged)
+		return -EALREADY;
+
 	/* XXX: notify the device */
+
+	cdev->plugged = false;
 
 	kfree(cdev->edid);
 	cdev->edid = NULL;

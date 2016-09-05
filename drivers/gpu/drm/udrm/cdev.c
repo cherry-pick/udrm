@@ -133,9 +133,8 @@ static int udrm_cdev_ioctl_plug(struct udrm_cdev *cdev, unsigned long arg)
 		}
 	}
 
-	/* XXX: notify the device */
-
 	cdev->plugged = true;
+	udrm_device_hotplug(cdev->udrm);
 
 	WARN_ON(cdev->edid);
 	cdev->edid = edid;
@@ -153,9 +152,8 @@ static int udrm_cdev_ioctl_unplug(struct udrm_cdev *cdev)
 	if (!cdev->plugged)
 		return -EALREADY;
 
-	/* XXX: notify the device */
-
 	cdev->plugged = false;
+	udrm_device_hotplug(cdev->udrm);
 
 	kfree(cdev->edid);
 	cdev->edid = NULL;

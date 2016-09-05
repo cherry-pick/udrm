@@ -44,6 +44,8 @@ bool udrm_device_is_registered(struct udrm_device *udrm);
 int udrm_device_register(struct udrm_device *udrm, struct udrm_cdev *cdev);
 void udrm_device_unregister(struct udrm_device *udrm);
 
+void udrm_device_hotplug(struct udrm_device *udrm);
+
 /* udrm gem */
 
 struct udrm_bo {

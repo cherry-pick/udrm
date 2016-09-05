@@ -9,6 +9,7 @@
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
 #include <drm/drmP.h>
+#include <drm/drm_crtc_helper.h>
 #include <drm/drm_gem.h>
 #include <linux/atomic.h>
 #include <linux/device.h>
@@ -199,6 +200,11 @@ void udrm_device_unregister(struct udrm_device *udrm)
 		udrm_device_unbind(udrm);
 		mutex_unlock(&udrm_drm_lock);
 	}
+}
+
+void udrm_device_hotplug(struct udrm_device *udrm)
+{
+	drm_kms_helper_hotplug_event(udrm->ddev);
 }
 
 static int udrm_drm_fop_open(struct inode *inode, struct file *file)

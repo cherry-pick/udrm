@@ -9,8 +9,6 @@
 
 #define _GNU_SOURCE
 #include <stdlib.h>
-#include <sys/ioctl.h>
-#include <linux/udrm.h>
 #include "test.h"
 
 /* make sure /dev/udrm exists, is a cdev and accessible */

@@ -152,11 +152,11 @@ int udrm_device_register(struct udrm_device *udrm, struct udrm_cdev *cdev)
 	if (WARN_ON(!udrm_device_is_new(udrm)))
 		return -ENOTRECOVERABLE;
 
-	mutex_lock(&udrm_drm_lock);
-
 	down_write(&udrm->cdev_lock);
 	udrm->cdev_unlocked = cdev;
 	up_write(&udrm->cdev_lock);
+
+	mutex_lock(&udrm_drm_lock);
 
 	r = udrm_device_bind(udrm);
 	if (r < 0)
@@ -188,17 +188,17 @@ exit:
 
 void udrm_device_unregister(struct udrm_device *udrm)
 {
-	mutex_lock(&udrm_drm_lock);
 	if (udrm_device_is_registered(udrm)) {
 		down_write(&udrm->cdev_lock);
 		udrm->cdev_unlocked = ERR_PTR(-ENODEV);
 		up_write(&udrm->cdev_lock);
 
+		mutex_lock(&udrm_drm_lock);
 		drm_dev_unregister(udrm->ddev);
 		device_del(&udrm->dev);
 		udrm_device_unbind(udrm);
+		mutex_unlock(&udrm_drm_lock);
 	}
-	mutex_unlock(&udrm_drm_lock);
 }
 
 static int udrm_drm_fop_open(struct inode *inode, struct file *file)
@@ -206,6 +206,21 @@ static int udrm_drm_fop_open(struct inode *inode, struct file *file)
 	struct udrm_device *udrm;
 	struct drm_device *ddev;
 	int r;
+
+	/*
+	 * Preferably, here we would call drm_minor_acquire(), then check that
+	 * our device is still bound via udrm_device_bind(), and then as last
+	 * step call into drm_open(). However, drm_minor_acquire() is not
+	 * exposed, so we have to lock manually:
+	 *
+	 *     We add the udrm_drm_lock as a guard that always makes sure the
+	 *     our bind/unbind calls are atomic with device registration. That
+	 *     is, we lock around udrm_drm_bind() and drm_dev_register(), as
+	 *     well as drm_dev_unregister() and udrm_drm_unbind(). This
+	 *     guarantees that here in .open() we know that between drm_open
+	 *     and udrm_device_bind() the device cannot be removed. This is the
+	 *     only purpose of udrm_drm_lock! Don't use it for anything else.
+	 */
 
 	mutex_lock(&udrm_drm_lock);
 

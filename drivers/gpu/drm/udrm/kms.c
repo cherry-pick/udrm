@@ -55,8 +55,20 @@ static const struct drm_connector_helper_funcs udrm_conn_hops = {
 static enum drm_connector_status udrm_conn_detect(struct drm_connector *conn,
 						  bool force)
 {
-	/* XXX: check hw state */
-	return connector_status_connected;
+	struct udrm_device *udrm = conn->dev->dev_private;
+	struct udrm_cdev *cdev;
+	enum drm_connector_status status = connector_status_disconnected;
+
+	cdev = udrm_device_acquire(udrm);
+	if (cdev) {
+		mutex_lock(&cdev->lock);
+		if (cdev->plugged)
+			status = connector_status_connected;
+		mutex_unlock(&cdev->lock);
+		udrm_device_release(udrm, cdev);
+	}
+
+	return status;
 }
 
 static const struct drm_connector_funcs udrm_conn_ops = {

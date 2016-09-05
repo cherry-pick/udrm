@@ -48,9 +48,9 @@ struct udrm_device *udrm_device_new(struct device *parent)
 	init_rwsem(&udrm->cdev_lock);
 
 	mutex_lock(&udrm_drm_lock);
-
 	r = dev_set_name(&udrm->dev, KBUILD_MODNAME "-%llu",
-			 (unsigned long long)id_counter);
+			 (unsigned long long)id_counter++);
+	mutex_unlock(&udrm_drm_lock);
 	if (r < 0)
 		goto error;
 
@@ -60,15 +60,10 @@ struct udrm_device *udrm_device_new(struct device *parent)
 		goto error;
 	}
 
-	id_counter++;
-
-	mutex_unlock(&udrm_drm_lock);
-
 	udrm->ddev->dev_private = udrm;
 	return udrm;
 
 error:
-	mutex_unlock(&udrm_drm_lock);
 	put_device(&udrm->dev);
 	return ERR_PTR(r);
 }

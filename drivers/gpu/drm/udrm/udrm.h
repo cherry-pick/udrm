@@ -76,6 +76,12 @@ void udrm_kms_unbind(struct udrm_device *udrm);
 
 /* udrm cdevs */
 
+struct udrm_cdev {
+	struct mutex lock;
+	struct udrm_device *udrm;
+	struct edid *edid;
+};
+
 extern struct miscdevice udrm_cdev_misc;
 
 #endif /* __UDRM_UDRM_H */

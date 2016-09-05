@@ -19,12 +19,6 @@
 #include <uapi/linux/udrm.h>
 #include "udrm.h"
 
-struct udrm_cdev {
-	struct mutex lock;
-	struct udrm_device *udrm;
-	struct edid *edid;
-};
-
 static struct udrm_cdev *udrm_cdev_free(struct udrm_cdev *cdev)
 {
 	if (cdev) {

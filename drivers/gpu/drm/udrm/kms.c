@@ -27,19 +27,24 @@ static const uint32_t udrm_formats[] = {
 static int udrm_conn_get_modes(struct drm_connector *conn)
 {
 	struct udrm_device *udrm = conn->dev->dev_private;
-	struct drm_display_mode *mode;
+	struct udrm_cdev *cdev;
+	int r = 0;
 
-	/* XXX: should be provided by hw */
-	mode = drm_cvt_mode(udrm->ddev, 800, 600,
-			    60, false, false, false);
-	if (!mode)
-		return 0;
+	cdev = udrm_device_acquire(udrm);
+	if (cdev) {
+		mutex_lock(&cdev->lock);
+		r = drm_mode_connector_update_edid_property(conn, cdev->edid);
+		if (r < 0)
+			r = 0;
+		else
+			r = drm_add_edid_modes(conn, cdev->edid);
+		mutex_unlock(&cdev->lock);
+		udrm_device_release(udrm, cdev);
+	} else {
+		drm_mode_connector_update_edid_property(conn, NULL);
+	}
 
-	mode->type = DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED;
-	drm_mode_set_name(mode);
-	drm_mode_probed_add(conn, mode);
-
-	return 1;
+	return r;
 }
 
 static const struct drm_connector_helper_funcs udrm_conn_hops = {

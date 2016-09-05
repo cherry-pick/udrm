@@ -8,6 +8,7 @@
  */
 
 #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+#include <drm/drm_edid.h>
 #include <linux/err.h>
 #include <linux/fs.h>
 #include <linux/kernel.h>
@@ -21,6 +22,7 @@
 struct udrm_cdev {
 	struct mutex lock;
 	struct udrm_device *udrm;
+	struct edid *edid;
 };
 
 static struct udrm_cdev *udrm_cdev_free(struct udrm_cdev *cdev)
@@ -28,6 +30,7 @@ static struct udrm_cdev *udrm_cdev_free(struct udrm_cdev *cdev)
 	if (cdev) {
 		udrm_device_unref(cdev->udrm);
 		mutex_destroy(&cdev->lock);
+		kfree(cdev->edid);
 		kfree(cdev);
 	}
 
@@ -99,6 +102,64 @@ static int udrm_cdev_fop_mmap(struct file *file, struct vm_area_struct *vma)
 	return -EIO;
 }
 
+static int udrm_cdev_ioctl_plug(struct udrm_cdev *cdev, unsigned long arg)
+{
+	struct udrm_cmd_plug param;
+	struct edid *edid;
+	int r;
+
+	BUILD_BUG_ON(_IOC_SIZE(UDRM_CMD_PLUG) != sizeof(param));
+
+	if (copy_from_user(&param, (void __user *)arg, sizeof(param)))
+		return -EFAULT;
+	if (unlikely(param.flags) ||
+	    unlikely(param.n_edid > sizeof(*edid)))
+		return -EINVAL;
+
+	if (unlikely(param.ptr_edid != (u64)(unsigned long)param.ptr_edid))
+		return -EFAULT;
+
+	if (!param.n_edid) {
+		edid = NULL;
+	} else {
+		edid = kzalloc(sizeof(*edid), GFP_KERNEL);
+		if (!edid)
+			return -ENOMEM;
+
+		if (copy_from_user(edid, (void __user *)param.ptr_edid,
+				   param.n_edid)) {
+			r = -EFAULT;
+			goto error;
+		}
+
+		if (!drm_edid_is_valid(edid)) {
+			r = -EINVAL;
+			goto error;
+		}
+	}
+
+	/* XXX: notify the device */
+
+	kfree(cdev->edid);
+	cdev->edid = edid;
+
+	return 0;
+
+error:
+	kfree(edid);
+	return r;
+}
+
+static int udrm_cdev_ioctl_unplug(struct udrm_cdev *cdev)
+{
+	/* XXX: notify the device */
+
+	kfree(cdev->edid);
+	cdev->edid = NULL;
+
+	return 0;
+}
+
 static long udrm_cdev_fop_ioctl(struct file *file,
 				unsigned int cmd,
 				unsigned long arg)
@@ -109,30 +170,38 @@ static long udrm_cdev_fop_ioctl(struct file *file,
 	mutex_lock(&cdev->lock);
 	switch (cmd) {
 	case UDRM_CMD_REGISTER:
-		if (unlikely(arg))
-			r = -EINVAL;
-		else if (udrm_device_is_registered(cdev->udrm))
+		if (udrm_device_is_registered(cdev->udrm))
 			r = -EISCONN;
 		else if (!udrm_device_is_new(cdev->udrm))
 			r = -ESHUTDOWN;
+		else if (unlikely(arg))
+			r = -EINVAL;
 		else
 			r = udrm_device_register(cdev->udrm, cdev);
 		break;
 	case UDRM_CMD_UNREGISTER:
-		if (unlikely(arg))
-			r = -EINVAL;
-		else if (udrm_device_is_new(cdev->udrm))
+		if (udrm_device_is_new(cdev->udrm))
 			r = -ENOTCONN;
 		else if (!udrm_device_is_registered(cdev->udrm))
 			r = -ESHUTDOWN;
+		else if (unlikely(arg))
+			r = -EINVAL;
 		else
 			udrm_device_unregister(cdev->udrm);
 		break;
 	case UDRM_CMD_PLUG:
-		r = -ENOTTY; /* XXX: not implemented */
+		if (!udrm_device_is_registered(cdev->udrm))
+			r = -ENOTCONN;
+		else
+			r = udrm_cdev_ioctl_plug(cdev, arg);
 		break;
 	case UDRM_CMD_UNPLUG:
-		r = -ENOTTY; /* XXX: not implemented */
+		if (!udrm_device_is_registered(cdev->udrm))
+			r = -ENOTCONN;
+		else if (unlikely(arg))
+			r = -EINVAL;
+		else
+			r = udrm_cdev_ioctl_unplug(cdev);
 		break;
 	default:
 		r = -ENOTTY;

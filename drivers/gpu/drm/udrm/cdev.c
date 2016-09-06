@@ -19,6 +19,9 @@
 #include <uapi/linux/udrm.h>
 #include "udrm.h"
 
+/* EDID consists of a base block and at most 0xff extensions */
+#define UDRM_MAX_EDID_SIZE (EDID_LENGTH * 0x100)
+
 static struct udrm_cdev *udrm_cdev_free(struct udrm_cdev *cdev)
 {
 	if (cdev) {
@@ -99,7 +102,7 @@ static int udrm_cdev_ioctl_plug(struct udrm_cdev *cdev, unsigned long arg)
 	if (copy_from_user(&param, (void __user *)arg, sizeof(param)))
 		return -EFAULT;
 	if (unlikely(param.flags) ||
-	    unlikely(param.n_edid > sizeof(*edid)))
+	    unlikely(param.n_edid > UDRM_MAX_EDID_SIZE))
 		return -EINVAL;
 
 	if (unlikely(param.ptr_edid != (u64)(unsigned long)param.ptr_edid))
@@ -111,7 +114,7 @@ static int udrm_cdev_ioctl_plug(struct udrm_cdev *cdev, unsigned long arg)
 	if (!param.n_edid) {
 		edid = NULL;
 	} else {
-		edid = kzalloc(sizeof(*edid), GFP_KERNEL);
+		edid = kmalloc(param.n_edid, GFP_KERNEL);
 		if (!edid)
 			return -ENOMEM;
 
@@ -120,6 +123,9 @@ static int udrm_cdev_ioctl_plug(struct udrm_cdev *cdev, unsigned long arg)
 			r = -EFAULT;
 			goto error;
 		}
+
+		if (param.n_edid != EDID_LENGTH * (edid->extensions + 1))
+			return -EINVAL;
 
 		if (!drm_edid_is_valid(edid)) {
 			r = -EINVAL;
